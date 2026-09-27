@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deblot Studio</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --accent:#5b8cff;
+    --accent2:#ff5b8c; --text:#e8eaf0; --muted:#8a90a2; --border:#262a35;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column;
+  }
+  header{
+    padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:10px;
+  }
+  header .logo{font-weight:700; font-size:18px; letter-spacing:.5px;}
+  header .logo span{color:var(--accent);}
+  header .status{margin-left:auto; font-size:13px; color:var(--muted);}
+  header .status.live{color:var(--accent2); font-weight:600;}
+  main{flex:1; display:flex; min-height:0;}
+  .stage{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    background:#000; position:relative; padding:16px;
+  }
+  #canvas{
+    max-width:100%; max-height:100%; border-radius:10px; box-shadow:0 0 0 1px var(--border);
+    background:#000;
+  }
+  aside{
+    width:300px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:18px;
+  }
+  section h3{
+    margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  }
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px;
+  }
+  button:hover{border-color:var(--accent);}
+  button.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  button.danger.active{background:var(--accent2); border-color:var(--accent2);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  select, input[type=text]{
+    width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    padding:7px 8px; border-radius:8px; font-size:13px;
+  }
+  .bg-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+  .bg-swatch{
+    height:36px; border-radius:6px; cursor:pointer; border:2px solid transparent;
+  }
+  .bg-swatch.selected{border-color:var(--accent);}
+  label{font-size:12px; color:var(--muted); display:block; margin-bottom:4px;}
+  .field{margin-bottom:10px;}
+  footer{
+    background:var(--panel); border-top:1px solid var(--border);
+    padding:10px 18px; display:flex; align-items:center; gap:10px;
+  }
+  #recBtn{
+    background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;
+    padding:10px 20px; border-radius:20px;
+  }
+  #timer{font-variant-numeric:tabular-nums; color:var(--muted);}
+  #clipsList{display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;}
+  .clip-item{
+    display:flex; justify-content:space-between; align-items:center; background:var(--panel2);
+    border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px;
+  }
+  .clip-item a{color:var(--accent); text-decoration:none;}
+  .hint{font-size:11px; color:var(--muted); line-height:1.4;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Deb<span>lot</span></div>
+  <div class="status" id="status">Idle</div>
+</header>
+
+<main>
+  <div class="stage">
+    <canvas id="canvas" width="1280" height="720"></canvas>
+  </div>
+
+  <aside>
+    <section>
+      <h3>Sources</h3>
+      <div class="row">
+        <button id="camBtn">Camera</button>
+        <button id="screenBtn">Screen Share</button>
+      </div>
+    </section>
+
+    <section id="guestSection">
+      <h3>Guests <span class="hint">(free, unlimited)</span></h3>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="inviteBtn">Get Invite Link</button>
+      </div>
+      <div class="field" id="inviteBox" style="display:none;">
+        <label>Share this link with a guest</label>
+        <input type="text" id="inviteLink" readonly onclick="this.select()">
+      </div>
+      <div id="guestList" class="hint"></div>
+    </section>
+
+    <section>
+      <h3>Layout</h3>
+      <div class="row" id="layoutRow">
+        <button class="layout-btn active" data-layout="solo">Solo</button>
+        <button class="layout-btn" data-layout="pip">PiP</button>
+        <button class="layout-btn" data-layout="side">Side-by-side</button>
+        <button class="layout-btn" data-layout="grid">Grid</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Background <span class="hint">(camera only, free)</span></h3>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="bgToggle">Enable Replace</button>
+      </div>
+      <div class="bg-grid" id="bgGrid"></div>
+    </section>
+
+    <section>
+      <h3>Watermark <span class="hint">(free, fully editable)</span></h3>
+      <div class="field">
+        <label>Text</label>
+        <input type="text" id="wmText" value="Deblot" maxlength="24">
+      </div>
+      <div class="field">
+        <label>Position</label>
+        <select id="wmPos">
+          <option value="br">Bottom Right</option>
+          <option value="bl">Bottom Left</option>
+          <option value="tr">Top Right</option>
+          <option value="tl">Top Left</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="wmToggle" class="active">Watermark On</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>Record</h3>
+      <div class="hint">Records locally in your browser. Nothing is uploaded.</div>
+    </section>
+
+    <section>
+      <h3>Clips <span class="hint">(free, unlimited, no watermark lock)</span></h3>
+      <div class="hint" style="margin-bottom:8px;">Mark clips live while recording, or trim the full recording afterwards below.</div>
+      <div id="clipsList"></div>
+    </section>
+
+    <section id="trimSection" style="display:none;">
+      <h3>Trim Full Recording</h3>
+      <video id="trimPreview" style="width:100%; border-radius:8px; background:#000;" controls></video>
+      <div class="field" style="margin-top:8px;">
+        <label>In point: <span id="trimInLabel">0.0s</span></label>
+        <input type="range" id="trimIn" min="0" max="100" value="0" step="0.1">
+      </div>
+      <div class="field">
+        <label>Out point: <span id="trimOutLabel">0.0s</span></label>
+        <input type="range" id="trimOut" min="0" max="100" value="100" step="0.1">
+      </div>
+      <button id="trimExportBtn">Export This Clip</button>
+    </section>
+  </aside>
+</main>
+
+<footer>
+  <button id="recBtn">● Start Recording</button>
+  <span id="timer">00:00</span>
+  <button id="markBtn" disabled>Mark Clip Start</button>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="studio.js"></script>
+</body>
+</html>
