@@ -28,7 +28,8 @@ const state = {
   clips: [],
   peer: null,
   connections: [],   // {id, video, stream}
-  isGuest: false
+  isGuest: false,
+  youtube: { clientId: null, tokenClient: null, accessToken: null, channelName: null }
 };
 
 /* ---------- Backgrounds (free library, no paywall) ---------- */
@@ -190,6 +191,82 @@ async function initGuestModeIfNeeded(){
   });
 }
 initGuestModeIfNeeded();
+
+/* ---------- YouTube authentication (client-side OAuth via Google Identity Services) ----------
+   Actual RTMP push to YouTube Live still needs a relay server (browsers can't emit RTMP),
+   but auth + creating the broadcast/stream key is pure client-side. */
+const YT_SCOPE = 'https://www.googleapis.com/auth/youtube';
+const ytStatusEl = document.getElementById('ytStatus');
+const ytConnectBtn = document.getElementById('ytConnectBtn');
+const ytClientIdBox = document.getElementById('ytClientIdBox');
+const ytClientIdInput = document.getElementById('ytClientId');
+
+function loadSavedClientId(){
+  const saved = localStorage.getItem('deblot_yt_client_id');
+  if (saved) state.youtube.clientId = saved;
+  return saved;
+}
+
+function initTokenClient(){
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return null;
+  state.youtube.tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: state.youtube.clientId,
+    scope: YT_SCOPE,
+    callback: async (resp) => {
+      if (resp.error){
+        ytStatusEl.textContent = 'Connection failed: ' + resp.error;
+        return;
+      }
+      state.youtube.accessToken = resp.access_token;
+      await confirmYouTubeConnection();
+    }
+  });
+  return state.youtube.tokenClient;
+}
+
+async function confirmYouTubeConnection(){
+  ytStatusEl.textContent = 'Verifying…';
+  try {
+    const r = await fetch(
+      'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+      { headers: { Authorization: 'Bearer ' + state.youtube.accessToken } }
+    );
+    const data = await r.json();
+    if (data.items && data.items.length){
+      state.youtube.channelName = data.items[0].snippet.title;
+      ytStatusEl.textContent = `Connected as ${state.youtube.channelName}`;
+      ytConnectBtn.textContent = 'Reconnect YouTube';
+      ytConnectBtn.classList.add('active');
+    } else {
+      ytStatusEl.textContent = 'Connected, but no YouTube channel found on this account.';
+    }
+  } catch (e) {
+    ytStatusEl.textContent = 'Verification failed: ' + e.message;
+  }
+}
+
+ytConnectBtn.addEventListener('click', () => {
+  const saved = loadSavedClientId();
+  if (!saved){
+    ytClientIdBox.style.display = 'block';
+    return;
+  }
+  const client = state.youtube.tokenClient || initTokenClient();
+  if (client) client.requestAccessToken();
+  else ytStatusEl.textContent = 'Google sign-in library still loading — try again in a moment.';
+});
+
+document.getElementById('ytSaveClientId').addEventListener('click', () => {
+  const id = ytClientIdInput.value.trim();
+  if (!id){ alert('Paste your OAuth Client ID first.'); return; }
+  localStorage.setItem('deblot_yt_client_id', id);
+  state.youtube.clientId = id;
+  ytClientIdBox.style.display = 'none';
+  const client = initTokenClient();
+  if (client) client.requestAccessToken();
+});
+
+loadSavedClientId();
 
 /* ---------- Layout ---------- */
 document.querySelectorAll('.layout-btn').forEach(btn => {
