@@ -152,6 +152,19 @@
       <div class="hint">Records locally in your browser. Nothing is uploaded.</div>
     </section>
 
+    <section id="multistreamSection">
+      <h3>Multistream</h3>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="ytConnectBtn">Connect YouTube</button>
+      </div>
+      <div id="ytStatus" class="hint">Not connected</div>
+      <div class="field" id="ytClientIdBox" style="display:none; margin-top:8px;">
+        <label>YouTube OAuth Client ID (saved locally, one-time)</label>
+        <input type="text" id="ytClientId" placeholder="498143511723-sjkef65vbnfkga1m0velf9911ama52iq.apps.googleusercontent.com">
+        <button id="ytSaveClientId" style="margin-top:6px;">Save & Connect</button>
+      </div>
+    </section>
+
     <section>
       <h3>Clips <span class="hint">(free, unlimited, no watermark lock)</span></h3>
       <div class="hint" style="margin-bottom:8px;">Mark clips live while recording, or trim the full recording afterwards below.</div>
@@ -182,6 +195,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="studio.js"></script>
 </body>
 </html>
